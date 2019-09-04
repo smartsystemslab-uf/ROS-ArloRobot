@@ -17,7 +17,7 @@ if __name__ == '__main__':
 	serverSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # socket.SOCK_DGRAM tells the server to listend fo UDP packets
 	serverSocket.bind((SERVER_IP, SERVER_PORT))
 
-	rospy.init_node('udp-control-server', anonymous=False)
+	rospy.init_node('udp_control_server', anonymous=False)
 	vel_pub = rospy.Publisher("cmd_vel", Twist, queue_size=50)
 
 	cmd_vel = Twist()

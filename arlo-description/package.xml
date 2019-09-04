@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>arlo-description</name>
+  <version>1.0.0</version>
+  <description>ROS package for visualizing the Arlo robot in various configurations.</description>
+  <license>GPLv3</license>
+
+	<maintainer email="tjlwhitaker@gmail.com">Taylor JL Whitaker - Smart Systems Lab, University of Florida</maintainer>
+  <url type="website">https://github.com/smartsystemslab-uf</url>
+
+  <author email="tjlwhitaker@gmail.com">Taylor JL Whitaker</author>
+
+
+	<!-- The *depend tags are used to specify dependencies -->
+  <!-- Dependencies can be catkin packages or system dependencies -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+
+  </export>
+</package>

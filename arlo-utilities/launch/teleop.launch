@@ -1,6 +1,0 @@
-<launch>
-
- <param name="/use_sim_time" value="false" /> 
- <node name="ios_control" pkg="arlo-motor-controller-interface" type="arlo-ios-control-server.py" output="screen"/>
-
-</launch>

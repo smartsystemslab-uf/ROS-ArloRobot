@@ -1,0 +1,6 @@
+Sources:
+Kinect
+	https://github.com/RobotRose/kinect_description/blob/master/meshes/kinect.dae
+
+Caster Wheel
+	https://github.com/chrisl8/ArloBot/blob/kinetic/src/arlobot/arlobot_description/meshes/28971-Caster-Wheel-Kit-v1.0.stl

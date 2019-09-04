@@ -1,0 +1,6 @@
+<launch>
+
+ <param name="/use_sim_time" value="false" />
+ <node name="udp_control_server" pkg="arlo-utilities" type="udp-control-server.py" output="screen"/>
+
+</launch>
