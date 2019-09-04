@@ -1,0 +1,8 @@
+<launch>
+
+ <param name="/use_sim_time" value="false" />
+ <node name="laser" pkg="rplidar_ros" type="rplidarNode" output="screen"/>
+ <param name="/laser/serial_port" type="string" value="/dev/ttyUSB1"/>
+ <param name="serial_baudrate" type="int" value="115200"/>
+
+</launch>
