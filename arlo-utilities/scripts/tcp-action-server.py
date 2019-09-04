@@ -28,22 +28,22 @@ def command_handler(command):
 	print command
 	if 'REBOOT' in command:
 		print 'Command is: ' + command
-		os.system("rosrun arlo-utilities actionscripts/reboot.sh")
+		os.system("rosrun arlo-utilities reboot.sh")
 
 	elif 'MOTORS ON' in command:
 		print 'Command is: ' + command
-		os.system("rosrun arlo-utilities actionscripts/motor-relay-on.sh &")
+		os.system("rosrun arlo-utilities motor-relay-on.sh &")
 		# subprocess.call(['rosrun'], ['control-server'], ['motor-relay-on.sh'])
 
 	elif 'MOTORS OFF' in command:
 		print 'Command is: ' + command
 		# subprocess.call(['rosrun'], ['control-server'], ['motor-relay-off.sh'])
-		os.system("rosrun arlo-utilities actionscripts/motor-relay-off.sh &")
+		os.system("rosrun arlo-utilities motor-relay-off.sh &")
 
 	elif 'MOTORS RESET' in command:
 		print 'Command is: ' + command
 		# subprocess.call(['rosrun'], ['control-server'], ['motor-relay-toggle.sh'])
-		os.system("rosrun arlo-utilities actionscripts/motor-relay-toggle.sh &")
+		os.system("rosrun arlo-utilities motor-relay-toggle.sh &")
 
 	elif 'LIDAR ON' in command:
 		print 'Command is: ' + command
@@ -58,7 +58,7 @@ def command_handler(command):
 
 	elif 'GREET' in command:
 		print 'Command is: ' + command
-		os.system("rosrun arlo-utilities actionscripts/greet.py &")
+		os.system("rosrun arlo-utilities greet.py &")
 
 	elif 'GOTO' in command:
 
