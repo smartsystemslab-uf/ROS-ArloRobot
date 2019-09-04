@@ -1,0 +1,20 @@
+<launch>
+
+	<param name="/use_sim_time" value="false" />
+
+	<!-- Robot Description -->
+	<node name="dhb10_controller" pkg="dhb10-controller" type="motor-controller-interface.py" output="screen" respawn="true"/>
+
+	<!-- LIDAR -->
+	<node name="rplidar" pkg="rplidar_ros" type="rplidarNode" output="screen"/>
+	<param name="/laser/serial_port" type="string" value="/dev/ttyUSB1"/>
+	<param name="serial_baudrate" type="int" value="115200"/>
+
+	<!-- Motor Controller -->
+	<node name="dhb10_controller" pkg="dhb10-controller" type="motor-controller-interface.py" output="screen" respawn="true"/>
+
+	<!-- UDP Teleop -->
+	<node name="udp_control_server" pkg="arlo-utilities" type="udp-control-server.py" output="screen"/>
+
+
+</launch>
