@@ -104,7 +104,7 @@ if __name__ == '__main__':
  rospy.init_node('motor_controller', anonymous=False)
  rospy.Subscriber('/' + ros_ns + '/cmd_vel', Twist, velocity_callback)
 
- robot_saved_state = open('/home/ubuntu/ROS/arlo_ws/src/arlo-motor-controller-interface/saved-robot-state','w+')
+ robot_saved_state = open('/tmp/ROS/dhb10-controller/saved-robot-state','w+')
 
  # Disbale the motor controller power in case it is already on
  disable_motor_controller_power()
@@ -341,6 +341,7 @@ if __name__ == '__main__':
 
    # Publish the message
    odom_pub.publish(odom)
+   robot_saved_state.seek(0)
    robot_saved_state.write('\rSpeed: ' + str(odom.pose))
 
 
@@ -356,4 +357,3 @@ if __name__ == '__main__':
     th = 2*math.pi - th
 
   rospy.sleep(0.001)
-
