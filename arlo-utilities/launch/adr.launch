@@ -3,7 +3,8 @@
 	<param name="/use_sim_time" value="false" />
 
 	<!-- Robot Description -->
-	<node name="dhb10_controller" pkg="dhb10-controller" type="motor-controller-interface.py" output="screen" respawn="true"/>
+	<param name="robot_description" textfile="$(find arlo-description)/urdf/adr.urdf" />
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
 
 	<!-- LIDAR -->
 	<node name="rplidar" pkg="rplidar_ros" type="rplidarNode" output="screen"/>
