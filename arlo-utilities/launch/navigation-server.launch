@@ -1,0 +1,26 @@
+<launch>
+
+  <param name="/use_sim_time" value="false" />
+
+	<!-- RVIZ -->
+	<node name="rviz" pkg="rviz" type="rviz" respawn="true" args="-d $(find arlo-utilities)/config/rviz/arlo.rviz" />
+
+	<!-- Cartographer -->
+  <node name="cartographer_node" pkg="cartographer_ros" type="cartographer_node" respawn="true" output="screen"
+		args="-configuration_directory $(find arlo-utilities)/config/cartographer
+          -configuration_basename adr-cartographer-params.lua" />
+
+	<!-- Occupancy Grid Type Map from Cartographer Maps -->
+	<node name="cartographer_occupancy_grid_node" pkg="cartographer_ros" type="cartographer_occupancy_grid_node" respawn="true" args="-resolution 0.05" />
+
+	<!-- Move Base -->
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <rosparam file="$(find arlo-utilities)/config/move_base/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find arlo-utilities)/config/move_base/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find arlo-utilities)/config/move_base/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find arlo-utilities)/config/move_base/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find arlo-utilities)/config/move_base/base_local_planner_params.yaml" command="load" />
+    <rosparam file="$(find arlo-utilities)/config/move_base/move_base_params.yaml" command="load" />
+  </node>
+
+</launch>
