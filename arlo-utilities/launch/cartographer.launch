@@ -1,0 +1,14 @@
+<launch>
+
+  <param name="/use_sim_time" value="false" />
+
+	<!-- Cartographer -->
+  <node name="cartographer_node" pkg="cartographer_ros" type="cartographer_node" respawn="true" output="screen"
+		args="-configuration_directory $(find arlo-utilities)/config/cartographer
+          -configuration_basename adr-cartographer-params.lua" />
+
+	<!-- Occupancy Grid Type Map from Cartographer Maps -->
+	<node name="cartographer_occupancy_grid_node" pkg="cartographer_ros" type="cartographer_occupancy_grid_node" respawn="true" args="-resolution 0.05" />
+
+
+</launch>
