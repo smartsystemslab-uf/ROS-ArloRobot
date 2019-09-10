@@ -104,7 +104,7 @@ if __name__ == '__main__':
  rospy.init_node('motor_controller', anonymous=False)
  rospy.Subscriber('/' + ros_ns + '/cmd_vel', Twist, velocity_callback)
 
- robot_saved_state = open('/tmp/ROS/dhb10-controller/saved-robot-state','w+')
+ robot_saved_state = open('/var/log/ROS/dhb10-controller/saved-robot-state','w+')
 
  # Disbale the motor controller power in case it is already on
  disable_motor_controller_power()
