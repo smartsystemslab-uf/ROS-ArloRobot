@@ -31,12 +31,12 @@ def initialize_motor_controller_serial_reader():
 
 def initialize_motor_controller_serial_writer():
  # Connect first as default baud rate
- serial_writer = serial.Serial('/dev/ttyPS1', 19200)
+ serial_writer = serial.Serial('/dev/ttyPS3', 19200)
  serial_writer.write('baud 115200\r'.encode())
  serial_writer.close()
 
  # Connect at the desired baud rate
- serial_writer = serial.Serial('/dev/ttyPS1', 115200)
+ serial_writer = serial.Serial('/dev/ttyPS3', 115200)
  #ser.baudrate = 115200
 
  # Clear invalid baud rate command if baud rate already set
