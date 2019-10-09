@@ -25,7 +25,7 @@ global previousRightWheelSpeed
 
 
 def initialize_motor_controller_serial_reader():
- serial_reader = serial.Serial('/dev/ttyUL1', 115200, timeout=0.05)
+ serial_reader = serial.Serial('/dev/ttyUL2', 115200, timeout=0.05)
  return serial_reader
 
 
