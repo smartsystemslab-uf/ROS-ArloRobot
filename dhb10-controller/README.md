@@ -32,4 +32,4 @@ With the ZynqRobotControllerv2 design loaded on to a ZyboZ710, the GPIO tests fo
 ### Proper Terminal Soldering
 We need to be sure not to destroy the terminals for the motor controller switch in case we wish to replace it. Solder on the outside and near the bottom of the terminals as shown below.
 
-<p><img src="https://github.com/smartsystemslab-uf/ROS-ArloRobot/blob/master/dhb10-controller/Resources/Relay%20Wiring%20for%20ZynqRobotControllerv2%20on%20Arlo%20Robot.jpg?raw=True"/> </p>
+<p><img src="https://github.com/smartsystemslab-uf/ROS-ArloRobot/blob/master/dhb10-controller/Resources/TerminalSolderExample.jpg?raw=True"/> </p>
