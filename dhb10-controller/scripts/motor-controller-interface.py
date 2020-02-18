@@ -16,6 +16,16 @@ from std_msgs.msg import String
 # Core Dependencies
 import serial
 import time
+import mmap
+
+
+
+# Use relay for automatic error reset
+relay_support = True
+
+
+
+
 
 
 global currentLeftWheelSpeed
@@ -50,18 +60,53 @@ def initialize_motor_controller_serial_writer():
  return serial_writer
 
 
-
-def enable_motor_controller_power():
+# This function is special for one of the Arlo robots with
+#    the feather/relay stacked and acting as a UART device
+def enable_motor_controller_power_feather_relay_stack():
  serial_relay = serial.Serial('/dev/ttyUSB0', 115200)
  serial_relay.write('ON'.encode())
  serial_relay.close()
  time.sleep(5)
 
-
-def disable_motor_controller_power():
+def disable_motor_controller_power_feather_relay_stack():
  serial_relay = serial.Serial('/dev/ttyUSB0', 115200)
  serial_relay.write('OFF'.encode())
  serial_relay.close()
+ time.sleep(1)
+
+
+
+def enable_motor_controller_power_gpio_relay():
+ # Open the file descriptor for the GPIO IP
+ f = open('/dev/uio3', 'r+b')
+
+ # Map a single byte to memory (this will be the byte used by the GPIO pins)
+ #  Bit 7-2 = NC, Bit 1 = GPIO Output 1, Bit 0 = GPIO Output 0
+ m = mmap.mmap(f.fileno(), 1)
+ m.seek(0)
+
+ # GPIO Output 1 (Relay) High
+ m.write_byte('2')
+
+ m.close()
+ f.close()
+ time.sleep(5)
+
+
+def disable_motor_controller_power_gpio_relay():
+ # Open the file descriptor for the GPIO IP
+ f = open('/dev/uio3', 'r+b')
+
+ # Map a single byte to memory (this will be the byte used by the GPIO pins)
+ #  Bit 7-2 = NC, Bit 1 = GPIO Output 1, Bit 0 = GPIO Output 0
+ m = mmap.mmap(f.fileno(), 1)
+ m.seek(0)
+
+ # GPIO Output 1 (Relay) Low
+ m.write_byte('0')
+
+ m.close()
+ f.close()
  time.sleep(1)
 
 
@@ -106,11 +151,15 @@ if __name__ == '__main__':
 
  robot_saved_state = open('/var/log/ROS/dhb10-controller/saved-robot-state','w+')
 
- # Disbale the motor controller power in case it is already on
- disable_motor_controller_power()
+ if relay_support:
 
- # Enable the motor controller power
- enable_motor_controller_power()
+  # Disable the motor controller power in case it is already on
+  # disable_motor_controller_power()
+  disable_motor_controller_power_gpio_relay()
+
+  # Enable the motor controller power
+  # enable_motor_controller_power()
+  enable_motor_controller_power_gpio_relay()
 
 
  # Init the motor controller and get the serial writer
@@ -216,58 +265,61 @@ if __name__ == '__main__':
 
    robot_in_error = True
 
-   disable_motor_controller_power()
-   enable_motor_controller_power()
+   if relay_support:
 
-   serial_writer.close()
-   serial_reader.close()
+    # disable_motor_controller_power()
+    # enable_motor_controller_power()
+    disable_motor_controller_power_gpio_relay()
+    enable_motor_controller_power_gpio_relay()
 
-
-   # Init the motor controller and get the serial writer
-   serial_writer = initialize_motor_controller_serial_writer()
-
-   # Init the serial reader
-   serial_reader = initialize_motor_controller_serial_reader()
-
-   # Close the state file writer
-   # robot_saved_state.close()
+    serial_writer.close()
+    serial_reader.close()
 
 
-   # Get the last reported pose so as to not throw off any running localization nodes
-   # -Odom message format example
-   #	pose:
-   #	  position:
-   #	    x: 0.0
-   #	    y: 0.0
-   #	    z: 0.0
-   #	  orientation:
-   #	    x: 0.0
-   #	    y: 0.0
-   #	    z: 0.0
-   #	    w: 1.0
-   #	covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-   # robot_saved_state = open('/home/ubuntu/ROS/arlo_ws/src/arlo-motor-controller-interface/saved-robot-state')
-   robot_saved_state.seek(0)
-   robot_saved_state.readline()
-   robot_saved_state.readline()
-   x_pos_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   y_pos_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   z_pos_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   robot_saved_state.readline()
-   x_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   y_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   z_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   w_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
-   #covar_saved_state_offset = eval(robot_saved_state.readline().split(': ')[1])
+    # Init the motor controller and get the serial writer
+    serial_writer = initialize_motor_controller_serial_writer()
 
-   print str(x_pos_saved_state_offset)
-   print str(y_pos_saved_state_offset)
-   print str(z_pos_saved_state_offset)
-   print str(x_orient_saved_state_offset)
-   print str(y_orient_saved_state_offset)
-   print str(z_orient_saved_state_offset)
-   print str(w_orient_saved_state_offset)
-   #print str(covar_saved_state_offset)
+    # Init the serial reader
+    serial_reader = initialize_motor_controller_serial_reader()
+
+    # Close the state file writer
+    # robot_saved_state.close()
+
+    # Get the last reported pose so as to not throw off any running localization nodes
+    # -Odom message format example
+    #	pose:
+    #	  position:
+    #	    x: 0.0
+    #	    y: 0.0
+    #	    z: 0.0
+    #	  orientation:
+    #	    x: 0.0
+    #	    y: 0.0
+    #	    z: 0.0
+    #	    w: 1.0
+    #	covariance: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0]
+    # robot_saved_state = open('/home/ubuntu/ROS/arlo_ws/src/arlo-motor-controller-interface/saved-robot-state')
+    robot_saved_state.seek(0)
+    robot_saved_state.readline()
+    robot_saved_state.readline()
+    x_pos_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    y_pos_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    z_pos_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    robot_saved_state.readline()
+    x_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    y_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    z_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    w_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
+    #covar_saved_state_offset = eval(robot_saved_state.readline().split(': ')[1])
+
+    print str(x_pos_saved_state_offset)
+    print str(y_pos_saved_state_offset)
+    print str(z_pos_saved_state_offset)
+    print str(x_orient_saved_state_offset)
+    print str(y_orient_saved_state_offset)
+    print str(z_orient_saved_state_offset)
+    print str(w_orient_saved_state_offset)
+    #print str(covar_saved_state_offset)
 
    # Reopen the state file writer
    # robot_saved_state = open('/home/ubuntu/ROS/arlo_ws/src/arlo-motor-controller-interface/saved-robot-state','w+')
