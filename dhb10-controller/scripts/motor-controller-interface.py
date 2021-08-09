@@ -14,99 +14,85 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import String
 
 # Core Dependencies
-import serial
+#import serial
 import time
-import mmap
 
+import sys
+import traceback
 
+import json
+
+import uartlite
+from mmio import MMIO
 
 # Use relay for automatic error reset
 relay_support = True
 
+config_file = open('/home/xilinx/ROS-ArloRobot-master/src/dhb10-controller/scripts/ip_addr.config', 'r')
+
+ip_dict = json.load(config_file)
+uart_addr = ip_dict['uart_addr']
+
+mem_mapped = ip_dict['mem_mapped']
+register_rw = ip_dict['register_rw']
 
 
+uart_connection = uartlite.UartAXI(uart_addr, mem_mapped=mem_mapped, register_rw=register_rw)
 
+gpio_addr_range = ip_dict['gpio_addr_range']
+gpio_addr = ip_dict['gpio_addr']
+
+gpio_connection = MMIO(gpio_addr, gpio_addr_range, debug=False, mem_mapped=mem_mapped, register_rw=register_rw)
 
 
 global currentLeftWheelSpeed
 global currentRightWheelSpeed
 global previousLeftWheelSpeed
 global previousRightWheelSpeed
+global lastCallback
+global robot_in_error
 
-
-def initialize_motor_controller_serial_reader():
- serial_reader = serial.Serial('/dev/ttyUL2', 115200, timeout=0.05)
- return serial_reader
 
 
 def initialize_motor_controller_serial_writer():
- # Connect first as default baud rate
- serial_writer = serial.Serial('/dev/ttyPS3', 19200)
- serial_writer.write('baud 115200\r'.encode())
- serial_writer.close()
-
- # Connect at the desired baud rate
- serial_writer = serial.Serial('/dev/ttyPS3', 115200)
- #ser.baudrate = 115200
-
- # Clear invalid baud rate command if baud rate already set
- serial_writer.write('\r'.encode())
- serial_writer.write('\r'.encode())
 
  # Set motor controller parameters
- serial_writer.write('txpin ch2\r'.encode()) # Move tx to ch2 pin
+ uart_connection.write('txpin ch2\r') # Move tx to ch2 pin
  time.sleep(0.01)
-
- return serial_writer
-
-
-# This function is special for one of the Arlo robots with
-#    the feather/relay stacked and acting as a UART device
-def enable_motor_controller_power_feather_relay_stack():
- serial_relay = serial.Serial('/dev/ttyUSB0', 115200)
- serial_relay.write('ON'.encode())
- serial_relay.close()
- time.sleep(5)
-
-def disable_motor_controller_power_feather_relay_stack():
- serial_relay = serial.Serial('/dev/ttyUSB0', 115200)
- serial_relay.write('OFF'.encode())
- serial_relay.close()
- time.sleep(1)
-
 
 
 def enable_motor_controller_power_gpio_relay():
  # Open the file descriptor for the GPIO IP
- f = open('/dev/uio3', 'r+b')
 
  # Map a single byte to memory (this will be the byte used by the GPIO pins)
  #  Bit 7-2 = NC, Bit 1 = GPIO Output 1, Bit 0 = GPIO Output 0
- m = mmap.mmap(f.fileno(), 1)
- m.seek(0)
+ #m = mmap.mmap(f.fileno(), 1)
+ #m.seek(0)
 
  # GPIO Output 1 (Relay) High
- m.write_byte('2')
+ #m.write_byte('2')
 
- m.close()
- f.close()
+ #m.close()
+ #f.close()
+ gpio_connection.write(0, 0x0002)
  time.sleep(5)
 
 
 def disable_motor_controller_power_gpio_relay():
  # Open the file descriptor for the GPIO IP
- f = open('/dev/uio3', 'r+b')
+ #f = open('/dev/uio3', 'r+b')
 
  # Map a single byte to memory (this will be the byte used by the GPIO pins)
  #  Bit 7-2 = NC, Bit 1 = GPIO Output 1, Bit 0 = GPIO Output 0
- m = mmap.mmap(f.fileno(), 1)
- m.seek(0)
+ #m = mmap.mmap(f.fileno(), 1)
+ #m.seek(0)
 
  # GPIO Output 1 (Relay) Low
- m.write_byte('0')
+ #m.write_byte('0')
 
- m.close()
- f.close()
+ #m.close()
+ #f.close()
+ gpio_connection.write(0, 0x0000)
  time.sleep(1)
 
 
@@ -115,9 +101,13 @@ def velocity_callback(data):
  global currentRightWheelSpeed
  global previousLeftWheelSpeed
  global previousRightWheelSpeed
-
+ global lastCallback
+ global robot_in_error
+ 
+ print 'callback'
  #rospy.loginfo(rospy.get_caller_id() + "I heard %s", data)
  if robot_in_error:
+  print 'robot in error during velocity callback'
   return
 
  currentLeftWheelSpeed = 0
@@ -135,19 +125,29 @@ def velocity_callback(data):
   currentLeftWheelSpeed -= encoder_postions_per_meter * data.angular.z * wheelbase_radius_meters
 
  if previousLeftWheelSpeed != currentLeftWheelSpeed or previousRightWheelSpeed != currentRightWheelSpeed:
-  serial_writer.write(('gospd ' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)) + '\r').encode())
-  print 'GOSPD' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed))
+  uart_connection.write(('gospd ' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)) + '\r'))
+  print ('GOSPD ' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)))
 
  previousLeftWheelSpeed = currentLeftWheelSpeed
  previousRightWheelSpeed = currentRightWheelSpeed
+ lastCallback = rospy.get_rostime()
 
 
 
-if __name__ == '__main__':
+try:
  # Init ROS node
+ exc_info = sys.exc_info()
+ 
  ros_ns = rospy.get_namespace()
  rospy.init_node('motor_controller', anonymous=False)
- rospy.Subscriber('/' + ros_ns + '/cmd_vel', Twist, velocity_callback)
+ 
+ lastCallback = rospy.get_rostime()
+ robot_in_error = True
+ 
+ if ros_ns not in ['', '/', None]:
+  rospy.Subscriber('/' + ros_ns + '/cmd_vel', Twist, velocity_callback)
+ else: 
+  rospy.Subscriber('/cmd_vel', Twist, velocity_callback)
 
  robot_saved_state = open('/var/log/ROS/dhb10-controller/saved-robot-state','w+')
 
@@ -163,10 +163,7 @@ if __name__ == '__main__':
 
 
  # Init the motor controller and get the serial writer
- serial_writer = initialize_motor_controller_serial_writer()
-
- # Init the serial reader
- serial_reader = initialize_motor_controller_serial_reader()
+ initialize_motor_controller_serial_writer()
 
 
 
@@ -242,26 +239,30 @@ if __name__ == '__main__':
 
  # refresh_rate = 10.0 # Hz
  # r = rospy.Rate(10.0)
-
+ 
  while not rospy.is_shutdown():
 
-  serial_writer.write(('spd\r').encode())
-  speed_response = serial_reader.read(100)
+  uart_connection.write((('spd\r')))
+  speed_response = uart_connection.readLine(timeout=0.05)
 
   heading_response = str(th)
+  
+  if rospy.get_rostime() >= lastCallback + rospy.Duration(10):
+    print 'Last cmd_vel too old, still connected?'
+    uart_connection.write(('gospd ' + str(0) + ' ' + str(0) + '\r'))
 
-  print speed_response
+  #print ('speed_response', speed_response, '\n')
 
-  if speed_response is '':
-   print 'MOTOR CONTROLLER INITIALIZATION ERROR'
+  elif speed_response is '':
+   print ('MOTOR CONTROLLER INITIALIZATION ERROR')
    #exit()
 
    # Try closing the serial port
 
   elif 'motor' in speed_response or 'encoder' in speed_response or 'error' in speed_response:
-   print 'MOTOR CONTROLLER ERROR'
+   print ('MOTOR CONTROLLER ERROR')
 
-   print 'RESETTING MOTOR CONTROLLER'
+   print ('RESETTING MOTOR CONTROLLER')
 
    robot_in_error = True
 
@@ -272,15 +273,13 @@ if __name__ == '__main__':
     disable_motor_controller_power_gpio_relay()
     enable_motor_controller_power_gpio_relay()
 
-    serial_writer.close()
-    serial_reader.close()
+    #serial_writer.close()
+    #serial_reader.close()
 
 
     # Init the motor controller and get the serial writer
-    serial_writer = initialize_motor_controller_serial_writer()
+    initialize_motor_controller_serial_writer()
 
-    # Init the serial reader
-    serial_reader = initialize_motor_controller_serial_reader()
 
     # Close the state file writer
     # robot_saved_state.close()
@@ -312,13 +311,13 @@ if __name__ == '__main__':
     w_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
     #covar_saved_state_offset = eval(robot_saved_state.readline().split(': ')[1])
 
-    print str(x_pos_saved_state_offset)
-    print str(y_pos_saved_state_offset)
-    print str(z_pos_saved_state_offset)
-    print str(x_orient_saved_state_offset)
-    print str(y_orient_saved_state_offset)
-    print str(z_orient_saved_state_offset)
-    print str(w_orient_saved_state_offset)
+    #print (str(x_pos_saved_state_offset))
+    #print (str(y_pos_saved_state_offset))
+    #print (str(z_pos_saved_state_offset))
+    #print (str(x_orient_saved_state_offset))
+    #print (str(y_orient_saved_state_offset))
+    #print (str(z_orient_saved_state_offset))
+    #print (str(w_orient_saved_state_offset))
     #print str(covar_saved_state_offset)
 
    # Reopen the state file writer
@@ -330,7 +329,7 @@ if __name__ == '__main__':
 
   elif speed_response is not '':
 
-   print 'Speed: ' + speed_response + '   Heading: ' + heading_response
+   #print ('Speed: ' + speed_response + '   Heading: ' + heading_response)
 
 
    if re.match(r'-*\d{1,3}\s-*\d{1,3}', speed_response):
@@ -365,7 +364,7 @@ if __name__ == '__main__':
    y_timestep_plus_one += y_pos_saved_state_offset
    th_timestep_plus_one += z_orient_saved_state_offset
 
-   print str(x_timestep_plus_one) + ' ' + str(y_timestep_plus_one) + ' ' + str(th_timestep_plus_one)
+   print (str(x_timestep_plus_one) + ' ' + str(y_timestep_plus_one) + ' ' + str(th_timestep_plus_one))
 
    # since all odometry is 6DOF we'll need a quaternion created from yaw
    odom_quat = tf.transformations.quaternion_from_euler(0, 0, th_timestep_plus_one)
@@ -409,3 +408,15 @@ if __name__ == '__main__':
     th = 2*math.pi - th
 
   rospy.sleep(0.001)
+except Exception as e:
+ print(e)
+ print speed_response
+ print heading_response
+ print currentLeftWheelSpeed
+ print currentRightWheelSpeed
+ traceback.print_exception(*exc_info)
+finally:
+ gpio_connection.close()
+ 
+ uart_connection.write(('gospd ' + str(0) + ' ' + str(0) + '\r'))
+ uart_connection.close()
