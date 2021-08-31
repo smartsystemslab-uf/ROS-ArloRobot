@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
 
  # Velocity estimation [Left, Right]
- #new    
+ #new      
  wheel_velocity = np.array([('left', 0), ('right', 0)], dtype=[('side', 'U10'), ('velocity', 'i4')])
  #old
  #left_wheel_velocity = 0.0
