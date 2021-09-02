@@ -19,15 +19,12 @@ import time
 
 import sys
 import traceback
-
 import json
-
 import uartlite
 from mmio import MMIO
 
 # Use relay for automatic error reset
 relay_support = True
-
 config_file = open('/home/xilinx/ROS-ArloRobot-master/src/dhb10-controller/scripts/ip_addr.config', 'r')
 
 ip_dict = json.load(config_file)
@@ -36,14 +33,11 @@ uart_addr = ip_dict['uart_addr']
 mem_mapped = ip_dict['mem_mapped']
 register_rw = ip_dict['register_rw']
 
-
 uart_connection = uartlite.UartAXI(uart_addr, mem_mapped=mem_mapped, register_rw=register_rw)
 
 gpio_addr_range = ip_dict['gpio_addr_range']
 gpio_addr = ip_dict['gpio_addr']
-
 gpio_connection = MMIO(gpio_addr, gpio_addr_range, debug=False, mem_mapped=mem_mapped, register_rw=register_rw)
-
 
 global currentLeftWheelSpeed
 global currentRightWheelSpeed
@@ -53,13 +47,10 @@ global lastCallback
 global robot_in_error
 
 
-
 def initialize_motor_controller_serial_writer():
-
  # Set motor controller parameters
  uart_connection.write('txpin ch2\r') # Move tx to ch2 pin
  time.sleep(0.01)
-
 
 def enable_motor_controller_power_gpio_relay():
  # Open the file descriptor for the GPIO IP
@@ -77,7 +68,6 @@ def enable_motor_controller_power_gpio_relay():
  gpio_connection.write(0, 0x0002)
  time.sleep(5)
 
-
 def disable_motor_controller_power_gpio_relay():
  # Open the file descriptor for the GPIO IP
  #f = open('/dev/uio3', 'r+b')
@@ -94,7 +84,6 @@ def disable_motor_controller_power_gpio_relay():
  #f.close()
  gpio_connection.write(0, 0x0000)
  time.sleep(1)
-
 
 def velocity_callback(data):
  global currentLeftWheelSpeed
@@ -131,7 +120,6 @@ def velocity_callback(data):
  previousLeftWheelSpeed = currentLeftWheelSpeed
  previousRightWheelSpeed = currentRightWheelSpeed
  lastCallback = rospy.get_rostime()
-
 
 
 try:
