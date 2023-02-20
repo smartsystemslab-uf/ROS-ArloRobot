@@ -7,7 +7,7 @@ import re
 
 import rospy
 import tf
-
+import numpy as np
 
 from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3
 from nav_msgs.msg import Odometry
@@ -16,7 +16,7 @@ from std_msgs.msg import String
 # Core Dependencies
 #import serial
 import time
-
+import mmap
 import sys
 import traceback
 import json
@@ -114,13 +114,12 @@ def velocity_callback(data):
   currentLeftWheelSpeed -= encoder_postions_per_meter * data.angular.z * wheelbase_radius_meters
 
  if previousLeftWheelSpeed != currentLeftWheelSpeed or previousRightWheelSpeed != currentRightWheelSpeed:
-  uart_connection.write(('gospd ' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)) + '\r'))
-  print ('GOSPD ' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)))
+  serial_writer.write(('gospd ' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)) + '\r').encode())
+  print('GOSPD' + str(int(currentLeftWheelSpeed)) + ' ' + str(int(currentRightWheelSpeed)))
 
  previousLeftWheelSpeed = currentLeftWheelSpeed
  previousRightWheelSpeed = currentRightWheelSpeed
  lastCallback = rospy.get_rostime()
-
 
 try:
  # Init ROS node
@@ -138,6 +137,7 @@ try:
   rospy.Subscriber('/cmd_vel', Twist, velocity_callback)
 
  robot_saved_state = open('/var/log/ROS/dhb10-controller/saved-robot-state','w+')
+
 
  if relay_support:
 
@@ -171,19 +171,19 @@ try:
 
 
 
- # Tracked odometry
- x = 0.0
- y = 0.0
- th = 0.0
+ # Tracked odometry [x, y, th]
+ robot_odom = np.array([('x', 0), ('y', 0), ('th', 0)], dtype=[('name', 'U10'), ('coord', 'i4')])
+ 
+ #new [vx, vy, vth]
+ robot_vel = np.array([('vx', 0), ('vy', 0), ('vth', 0)], dtype=[('name', 'U10'), ('velocity', 'i4')]) 
 
- vx = 0.0
- vy = 0.0
- vth = 0.0
 
- # Euler integrated pose defined in odometry frame
- x_timestep_plus_one = 0.0
- y_timestep_plus_one = 0.0
- th_timestep_plus_one = 0.0
+
+
+ # Euler integrated pose defined in odometry frame [x, y, th]
+ timestep_plus_one = np.array([('x', 0), ('y', 0), ('th', 0)], dtype=[('name', 'U10'), ('coord', 'i4')]) 
+
+
 
  # Postional/rotational offset from a saved pose state for when the motor controller is reset during a run
  x_pos_saved_state_offset = 0.0
@@ -195,27 +195,27 @@ try:
  w_orient_saved_state_offset = 0.0
  covar_saved_state_offset = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
- # Encoder readings
- left_wheel_encoder_pos_per_sec = 0.0
- right_wheel_encoder_pos_per_sec = 0.0
+ # Encoder readings [Left, Right]
+ wheel_encoder_pos_per_sec = np.array([('left', 0), ('right', 0)], dtype=[('side', 'U10'), ('value', 'i4')])
 
 
- # Velocity estimations
- left_wheel_velocity = 0.0
- right_wheel_velocity = 0.0
 
- vx_meters_per_sec = 0.0
- vth_meters_per_sec = 0.0
- vth_radians_per_sec = 0.0
+ # Velocity estimation [Left, Right]   
+ wheel_velocity = np.array([('left', 0), ('right', 0)], dtype=[('side', 'U10'), ('velocity', 'i4')])
+
+
+ #[Vx meters, Vth meters, Vth radians]
+ robot_meters_per_sec = np.array([('vx_meters', 0), ('vth_meters', 0), ('vth_rads', 0)], dtype=[('name', 'U10'), ('velocity', 'i4')])
+
 
  # Position estimations
  left_wheel_pos_meters = 0.0
  right_wheel_pos_meters = 0.0
 
- # Odometry frame
- odom_vx_meters_per_sec = 0.0
- odom_vy_meters_per_sec = 0.0
- odom_vth_radians_per_sec = 0.0
+ # Odometry frame [vx, vy, vth]
+ odom_meters_per_sec = np.array([('vx_meters', 0), ('vy_meters', 0), ('vth_rads', 0)], dtype=[('name', 'U10'), ('velocity', 'i4')])
+
+
 
  currentLeftWheelSpeed = 0
  currentRightWheelSpeed = 0
@@ -227,30 +227,30 @@ try:
 
  # refresh_rate = 10.0 # Hz
  # r = rospy.Rate(10.0)
- 
+
  while not rospy.is_shutdown():
 
   uart_connection.write((('spd\r')))
   speed_response = uart_connection.readLine(timeout=0.05)
 
   heading_response = str(th)
-  
+
   if rospy.get_rostime() >= lastCallback + rospy.Duration(10):
     print 'Last cmd_vel too old, still connected?'
     uart_connection.write(('gospd ' + str(0) + ' ' + str(0) + '\r'))
 
-  #print ('speed_response', speed_response, '\n')
+  
 
   elif speed_response is '':
-   print ('MOTOR CONTROLLER INITIALIZATION ERROR')
+   print('MOTOR CONTROLLER INITIALIZATION ERROR')
    #exit()
 
    # Try closing the serial port
 
   elif 'motor' in speed_response or 'encoder' in speed_response or 'error' in speed_response:
-   print ('MOTOR CONTROLLER ERROR')
+   print('MOTOR CONTROLLER ERROR')
 
-   print ('RESETTING MOTOR CONTROLLER')
+   print('RESETTING MOTOR CONTROLLER')
 
    robot_in_error = True
 
@@ -299,13 +299,13 @@ try:
     w_orient_saved_state_offset = float(robot_saved_state.readline().split()[1])
     #covar_saved_state_offset = eval(robot_saved_state.readline().split(': ')[1])
 
-    #print (str(x_pos_saved_state_offset))
-    #print (str(y_pos_saved_state_offset))
-    #print (str(z_pos_saved_state_offset))
-    #print (str(x_orient_saved_state_offset))
-    #print (str(y_orient_saved_state_offset))
-    #print (str(z_orient_saved_state_offset))
-    #print (str(w_orient_saved_state_offset))
+    #print(str(x_pos_saved_state_offset))
+    #print(str(y_pos_saved_state_offset))
+    #print(str(z_pos_saved_state_offset))
+    #print(str(x_orient_saved_state_offset))
+    #print(str(y_orient_saved_state_offset))
+    #print(str(z_orient_saved_state_offset))
+    #print(str(w_orient_saved_state_offset))
     #print str(covar_saved_state_offset)
 
    # Reopen the state file writer
@@ -317,7 +317,7 @@ try:
 
   elif speed_response is not '':
 
-   #print ('Speed: ' + speed_response + '   Heading: ' + heading_response)
+   #print('Speed: ' + speed_response + '   Heading: ' + heading_response)
 
 
    if re.match(r'-*\d{1,3}\s-*\d{1,3}', speed_response):
@@ -325,41 +325,41 @@ try:
     current_time = rospy.Time.now()
     dt = (current_time - last_time).to_sec()
 
-    left_wheel_encoder_pos_per_sec = int(speed_response.split()[0])
-    right_wheel_encoder_pos_per_sec = int(speed_response.split()[1])
+    wheel_encoder_pos_per_sec[0] = int(speed_response.split()[0])
+    wheel_encoder_pos_per_sec[1] = int(speed_response.split()[1])
+    
 
-
-    left_wheel_velocity = left_wheel_encoder_pos_per_sec / encoder_postions_per_meter
-    right_wheel_velocity = right_wheel_encoder_pos_per_sec / encoder_postions_per_meter
-
-    vx_meters_per_sec = (left_wheel_velocity + right_wheel_velocity) / 2
-    vth_radians_per_sec = (right_wheel_velocity - left_wheel_velocity) / wheelbase_diameter_meters
-
-    # th = float(int(heading_response) * math.pi / 180)
-
-    odom_vx_meters_per_sec = vx_meters_per_sec * math.cos(th) # - vy * sin(theta), vy = 0 for diff drive
-    odom_vy_meters_per_sec = vx_meters_per_sec * math.sin(th) # + vy * cos(theta)
-    odom_vth_radians_per_sec = vth_radians_per_sec
-
-    x_timestep_plus_one = x + (odom_vx_meters_per_sec * dt)
-    y_timestep_plus_one = y + (odom_vy_meters_per_sec * dt)
-    th_timestep_plus_one = th + (odom_vth_radians_per_sec * dt)
-
-
-
+    wheel_velocity = wheel_encoder_pos_per_sec / encoder_postions_per_meter
+    
+    
+    robot_meters_per_sec['velocity'][0] = (wheel_velocity['velocity'][0] + wheel_velocity['velocity'][1]) / 2
+    robot_meters_per_sec['velocity'][2] = (wheel_velocity['velocity'][0] - wheel_velocity['velocity'][1]) / wheelbase_diameter_meters
+    
+    # th = float(int(heading_response) * math.pi / 180) # $$$ idk what this is 
+    
+    odom_meters_per_sec['velocity'][0] = robot_meters_per_sec['velocity'][0] * np.cos(robot_odom['coord'][2])
+    odom_meters_per_sec['velocity'][1] = robot_meters_per_sec['velocity'][1] * np.sin(robot_odom['coord'][2])
+    odom_meters_per_sec['velocity'][2] = robot_meters_per_sec['velocity'][2]
+    
+    timestep_plus_one['coord'][0] = robot_odom['coord'][0] + (odom_meters_per_sec['velocity'][0] * dt)
+    timestep_plus_one['coord'][1] = robot_odom['coord'][1] + (odom_meters_per_sec['velocity'][1] * dt)
+    timestep_plus_one['coord'][2] = robot_odom['coord'][2] + (odom_meters_per_sec['velocity'][2] * dt)
+    # VERIFIED UP TO HERE $$$$
+   
+   
    # Add any saved state offset, if any, to the odometry from motor controller readings
-   x_timestep_plus_one += x_pos_saved_state_offset
-   y_timestep_plus_one += y_pos_saved_state_offset
-   th_timestep_plus_one += z_orient_saved_state_offset
+   timestep_plus_one['coord'][0] += x_pos_saved_state_offset
+   timestep_plus_one['coord'][1] += y_pos_saved_state_offset
+   timestep_plus_one['coord'][2] += z_orient_saved_state_offset
 
-   print (str(x_timestep_plus_one) + ' ' + str(y_timestep_plus_one) + ' ' + str(th_timestep_plus_one))
+   print(str(timestep_plus_one['coord'][0]) + ' ' + str(timestep_plus_one['coord'][1]) + ' ' + str(timestep_plus_one['coord'][2]))
 
    # since all odometry is 6DOF we'll need a quaternion created from yaw
-   odom_quat = tf.transformations.quaternion_from_euler(0, 0, th_timestep_plus_one)
+   odom_quat = tf.transformations.quaternion_from_euler(0, 0, timestep_plus_one['coord'][2])
 
    # first, we'll publish the transform over tf
    tf_broadcaster.sendTransform(
-    (x_timestep_plus_one, y_timestep_plus_one, 0.),
+    (timestep_plus_one['coord'][0], timestep_plus_one['coord'][1], 0.),
     odom_quat,
     current_time,
     "base_link",
@@ -372,11 +372,11 @@ try:
    odom.header.frame_id = "odom"
 
    # Set the position
-   odom.pose.pose = Pose(Point(x_timestep_plus_one, y_timestep_plus_one, 0.), Quaternion(*odom_quat))
+   odom.pose.pose = Pose(Point(timestep_plus_one['coord'][0], timestep_plus_one['coord'][1], 0.), Quaternion(*odom_quat))
 
    # Set the velocity
    odom.child_frame_id = "base_link"
-   odom.twist.twist = Twist(Vector3(vx_meters_per_sec, 0, 0), Vector3(0, 0, odom_vth_radians_per_sec))
+   odom.twist.twist = Twist(Vector3(robot_meters_per_sec['velocity'][0], 0, 0), Vector3(0, 0, robot_meters_per_sec['velocity'][2]))
 
    # Publish the message
    odom_pub.publish(odom)
@@ -385,12 +385,12 @@ try:
 
 
    last_time = current_time
-   x = x_timestep_plus_one
-   y = y_timestep_plus_one
-   th = th_timestep_plus_one
+   robot_odom['coord'][0] = timestep_plus_one['coord'][0]
+   robot_odom['coord'][1] = timestep_plus_one['coord'][1]
+   robot_odom['coord'][2] = timestep_plus_one['coord'][2]
 
    if th >= 2*math.pi:
-    th = th - 2*math.pi
+    th  th - 2*math.pi
 
    if th < 0:
     th = 2*math.pi - th
@@ -398,10 +398,10 @@ try:
   rospy.sleep(0.001)
 except Exception as e:
  print(e)
- print speed_response
- print heading_response
- print currentLeftWheelSpeed
- print currentRightWheelSpeed
+ print(speed_response)
+ print(heading_response)
+ print(currentLeftWheelSpeed)
+ print(currentRightWheelSpeed)
  traceback.print_exception(*exc_info)
 finally:
  gpio_connection.close()
