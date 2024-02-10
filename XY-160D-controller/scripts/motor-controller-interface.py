@@ -1,4 +1,5 @@
 import Jetson.GPIO as GPIO
+import time
 
 
 def set_PWM_pin(PIN_nmb):
@@ -17,8 +18,22 @@ def set_duty_cycle(duty_cycle, pwm_obj):
 def main():
     # General GPIO setup
     xy_pwm = set_PWM_pin(33)
-    set_duty_cycle(70, xy_pwm)
-
+    # Jetson nano sample code to test pwm pin:
+    val = 25
+    incr = 5
+    print("PWM running. Press CTRL+C to exit.")
+    try:
+        while True:
+            time.sleep(0.25)
+            if val >= 100:
+                incr = -incr
+            if val <= 0:
+                incr = -incr
+            val += incr
+            xy_pwm.ChangeDutyCycle(val)
+    finally:
+        xy_pwm.stop()
+        GPIO.cleanup()
 
 if __name__ == "__main__":
     main()
